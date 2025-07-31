@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,6 +20,8 @@ import {
   Home,
   Bookmark,
   User,
+  Phone,
+  Mail,
 } from "lucide-react"
 
 export default function ConectaPlusApp() {
@@ -29,16 +31,52 @@ export default function ConectaPlusApp() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [userLocation, setUserLocation] = useState<string>("Palmas, TO")
+  const [companies, setCompanies] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // Mock data - will be replaced with Supabase data
-  const categories = [
-    { id: "alimentacao", name: "Alimentação", icon: "🍕", color: "bg-red-100 text-red-600" },
-    { id: "servicos", name: "Serviços", icon: "🔧", color: "bg-blue-100 text-blue-600" },
-    { id: "comercio", name: "Comércio", icon: "🛍️", color: "bg-green-100 text-green-600" },
-    { id: "saude", name: "Saúde", icon: "🏥", color: "bg-purple-100 text-purple-600" },
-    { id: "educacao", name: "Educação", icon: "📚", color: "bg-yellow-100 text-yellow-600" },
-    { id: "lazer", name: "Lazer", icon: "🎯", color: "bg-pink-100 text-pink-600" },
-  ]
+  useEffect(() => {
+    fetchCategories()
+    fetchCompanies()
+  }, [])
+
+  useEffect(() => {
+    if (currentView === "search") {
+      fetchCompanies()
+    }
+  }, [selectedCategory, searchQuery, currentView])
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories')
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar categorias:', error)
+    }
+  }
+
+  const fetchCompanies = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (selectedCategory) params.append('category', selectedCategory)
+      if (searchQuery) params.append('search', searchQuery)
+      params.append('limit', '20')
+
+      const response = await fetch(`/api/companies?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setCompanies(data.companies)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar empresas:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const stories = [
     { id: 1, business: "Pizza Express", avatar: "/placeholder.svg?height=60&width=60", hasNew: true },
@@ -48,41 +86,12 @@ export default function ConectaPlusApp() {
     { id: 5, business: "Farmácia Vida", avatar: "/placeholder.svg?height=60&width=60", hasNew: false },
   ]
 
-  const businesses = [
-    {
-      id: 1,
-      name: "Pizza Express Palmas",
-      category: "Restaurante",
-      rating: 4.8,
-      distance: "0.5 km",
-      isOpen: true,
-      image: "/placeholder.svg?height=200&width=300",
-      promo: "20% OFF na primeira compra",
-      address: "Quadra 103 Norte, Palmas - TO",
-    },
-    {
-      id: 2,
-      name: "Salão Bella Vista",
-      category: "Beleza",
-      rating: 4.9,
-      distance: "1.2 km",
-      isOpen: true,
-      image: "/placeholder.svg?height=200&width=300",
-      promo: "Corte + Escova R$ 45",
-      address: "Quadra 204 Sul, Palmas - TO",
-    },
-    {
-      id: 3,
-      name: "TechFix Assistência",
-      category: "Serviços",
-      rating: 4.7,
-      distance: "2.1 km",
-      isOpen: false,
-      image: "/placeholder.svg?height=200&width=300",
-      promo: null,
-      address: "Quadra 302 Norte, Palmas - TO",
-    },
-  ]
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
+    if (query.trim()) {
+      setCurrentView("search")
+    }
+  }
 
   const WelcomeScreen = () => (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-teal-500 flex items-center justify-center p-4">
@@ -145,9 +154,8 @@ export default function ConectaPlusApp() {
             <Input
               placeholder="Buscar empresas, produtos ou serviços..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="pl-10 pr-12 py-3 rounded-full border-gray-200 focus:border-purple-500"
-              onFocus={() => setCurrentView("search")}
             />
             <Button size="sm" className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full">
               <Filter className="w-4 h-4" />
@@ -209,31 +217,39 @@ export default function ConectaPlusApp() {
       <div className="px-4">
         <h2 className="text-lg font-semibold mb-3">Destaques próximos a você</h2>
         <div className="space-y-4">
-          {businesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+          {loading ? (
+            [...Array(3)].map((_, i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="h-48 bg-gray-200"></div>
+                <CardContent className="p-4">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </CardContent>
+              </Card>
+            ))
+          ) : companies.slice(0, 3).map((company) => (
+            <Card key={company.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="relative">
                 <img
-                  src={business.image || "/placeholder.svg"}
-                  alt={business.name}
+                  src="/placeholder.svg?height=200&width=300"
+                  alt={company.name}
                   className="w-full h-48 object-cover"
                 />
                 <Button size="sm" variant="ghost" className="absolute top-2 right-2 bg-white/80 hover:bg-white">
                   <Heart className="w-4 h-4" />
                 </Button>
-                {business.promo && (
-                  <Badge className="absolute bottom-2 left-2 bg-red-500 text-white">{business.promo}</Badge>
-                )}
               </div>
 
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h3 className="font-semibold text-lg">{business.name}</h3>
-                    <p className="text-gray-600 text-sm">{business.category}</p>
+                    <h3 className="font-semibold text-lg">{company.name}</h3>
+                    <p className="text-gray-600 text-sm">{company.category}</p>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{business.rating}</span>
+                    <span className="text-sm font-medium">4.5</span>
                   </div>
                 </div>
 
@@ -241,18 +257,18 @@ export default function ConectaPlusApp() {
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-4 h-4" />
-                      <span>{business.distance}</span>
+                      <span>1.2 km</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="w-4 h-4" />
-                      <span className={business.isOpen ? "text-green-600" : "text-red-600"}>
-                        {business.isOpen ? "Aberto" : "Fechado"}
+                      <span className={company.isOpen ? "text-green-600" : "text-red-600"}>
+                        {company.isOpen ? "Aberto" : "Fechado"}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-500 mt-1">{business.address}</p>
+                <p className="text-xs text-gray-500 mt-1">{company.address}</p>
               </CardContent>
             </Card>
           ))}
@@ -300,30 +316,57 @@ export default function ConectaPlusApp() {
 
       <div className="p-4">
         <div className="grid grid-cols-1 gap-4">
-          {businesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden">
+          {loading ? (
+            [...Array(5)].map((_, i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="flex">
+                  <div className="w-24 h-24 bg-gray-200"></div>
+                  <CardContent className="flex-1 p-4">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  </CardContent>
+                </div>
+              </Card>
+            ))
+          ) : companies.map((company) => (
+            <Card key={company.id} className="overflow-hidden">
               <div className="flex">
                 <img
-                  src={business.image || "/placeholder.svg"}
-                  alt={business.name}
+                  src="/placeholder.svg?height=96&width=96"
+                  alt={company.name}
                   className="w-24 h-24 object-cover"
                 />
                 <CardContent className="flex-1 p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-semibold">{business.name}</h3>
-                      <p className="text-gray-600 text-sm">{business.category}</p>
+                      <h3 className="font-semibold">{company.name}</h3>
+                      <p className="text-gray-600 text-sm">{company.category}</p>
                       <div className="flex items-center space-x-2 mt-1">
                         <div className="flex items-center space-x-1">
                           <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          <span className="text-xs">{business.rating}</span>
+                          <span className="text-xs">4.5</span>
                         </div>
                         <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-600">{business.distance}</span>
+                        <span className="text-xs text-gray-600">1.2 km</span>
                         <span className="text-xs text-gray-400">•</span>
-                        <span className={`text-xs ${business.isOpen ? "text-green-600" : "text-red-600"}`}>
-                          {business.isOpen ? "Aberto" : "Fechado"}
+                        <span className={`text-xs ${company.isOpen ? "text-green-600" : "text-red-600"}`}>
+                          {company.isOpen ? "Aberto" : "Fechado"}
                         </span>
+                      </div>
+                      <div className="flex items-center space-x-3 mt-2">
+                        {company.phone && (
+                          <div className="flex items-center space-x-1">
+                            <Phone className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-600">{company.phone}</span>
+                          </div>
+                        )}
+                        {company.email && (
+                          <div className="flex items-center space-x-1">
+                            <Mail className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-600">{company.email}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <Button size="sm" variant="ghost">
@@ -335,6 +378,15 @@ export default function ConectaPlusApp() {
             </Card>
           ))}
         </div>
+        
+        {!loading && companies.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Nenhuma empresa encontrada</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Tente ajustar os filtros ou termo de busca
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -342,6 +394,7 @@ export default function ConectaPlusApp() {
   const AdminScreen = () => (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm p-4">
+        <Button variant="ghost" onClick={() => setCurrentView("home")} className="mb-4">← Voltar</Button>
         <h1 className="text-2xl font-bold text-gray-800">Área Administrativa</h1>
         <p className="text-gray-600">Gerencie empresas e conteúdo do ConectaPlus</p>
       </div>
@@ -349,7 +402,7 @@ export default function ConectaPlusApp() {
       <div className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Importar Empresas</h3>
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Plus className="w-5 h-5" />Importar Empresas</h3>
             <p className="text-gray-600 text-sm mb-4">Importe dados de empresas em lote via Excel</p>
             <Button className="w-full">
               <Plus className="w-4 h-4 mr-2" />
@@ -358,7 +411,7 @@ export default function ConectaPlusApp() {
           </Card>
 
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-2">Gerenciar Empresas</h3>
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Settings className="w-5 h-5" />Gerenciar Empresas</h3>
             <p className="text-gray-600 text-sm mb-4">Visualize e edite informações das empresas</p>
             <Button variant="outline" className="w-full bg-transparent">
               <Settings className="w-4 h-4 mr-2" />
@@ -371,11 +424,11 @@ export default function ConectaPlusApp() {
           <h3 className="text-lg font-semibold mb-4">Estatísticas Rápidas</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-purple-600">57,503</p>
+              <p className="text-2xl font-bold text-purple-600">{companies.length}</p>
               <p className="text-sm text-gray-600">Empresas</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-blue-600">1,234</p>
+              <p className="text-2xl font-bold text-blue-600">0</p>
               <p className="text-sm text-gray-600">Usuários</p>
             </div>
             <div>
